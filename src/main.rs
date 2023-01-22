@@ -60,11 +60,12 @@ fn main() {
     println!("Candidates found in {:?}\n", end);
     println!("Possible intersections: {:?}\n", indexes);
 
-
+    // clone geom from the polygon vector
     let geom = all_polys[0].clone();
+
     // find the candidates and then check if actually intersecting
     let start = Instant::now();
-    //let index = find_candidate_indexes(r_tree.clone(), all_polys[0].clone());
+
 
     let mut true_hits = Vec::new();
 
@@ -80,9 +81,8 @@ fn main() {
 
 
 
-    // find the candidates and then check if actually intersecting
+    // check every polygon for intersection
     let start = Instant::now();
-    //let index = find_candidate_indexes(r_tree.clone(), all_polys[0].clone());
 
     let mut true_hits = Vec::new();
     for cand_index in 0..all_polys.len() {    
