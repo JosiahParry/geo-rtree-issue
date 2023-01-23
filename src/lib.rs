@@ -1,104 +1,62 @@
-// taken from https://github.com/geopolars/geopolars/blob/master/geopolars/src/spatial_index.rs#L208
-use geo::geometry::{Line, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
-use geo::BoundingRect;
-use rstar::{RTreeObject, AABB};
+use geo::geometry::Polygon;
+use rstar::primitives::GeomWithData;
 
-#[derive(Debug)]
-pub enum NodeEnvelope {
-    Point([f64; 2]),
-    BBox([[f64; 2]; 2]),
-}
+/// A [Polygon] and its original index
+pub type PolyWithIndex = GeomWithData<Polygon, usize>;
 
-impl From<Point> for NodeEnvelope {
-    fn from(point: Point<f64>) -> Self {
-        NodeEnvelope::Point([point.x(), point.y()])
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use geo::{BoundingRect, Intersects, Polygon};
+    use rstar::{RTree, AABB};
+    use std::io::BufRead;
+    use std::{fs::File, io::BufReader};
+    use wkt::TryFromWkt;
 
-impl From<Polygon> for NodeEnvelope {
-    fn from(polygon: Polygon<f64>) -> Self {
-        let envelope = polygon.bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
+    #[test]
+    fn tree_vs_naive() {
+        // read geometries from a text file
+        let f = File::open("geoms.txt").expect("this shit to work");
+        let f = BufReader::new(f);
+        // create a vector of polygons
+        let all_polys = f
+            .lines()
+            .enumerate()
+            .map(|(idx, line)| {
+                let line = line.expect("Unable to read line");
+                let ply: Polygon<f64> = Polygon::try_from_wkt_str(line.as_str()).unwrap();
+                PolyWithIndex::new(ply, idx)
+            })
+            .collect::<Vec<PolyWithIndex>>();
 
-// implement a from &Polygon, this is bad because it clones
-impl From<&Polygon> for NodeEnvelope {
-    fn from(polygon: &Polygon<f64>) -> Self {
-        let envelope = polygon.clone().bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
+        let geom = all_polys[0].geom().clone();
+        // create the tree
+        let ap = all_polys.clone();
+        let r_tree: RTree<_> = RTree::bulk_load(ap);
+        let rect = all_polys[0].clone().geom().bounding_rect().unwrap();
+        let bbox = [[rect.min().x, rect.min().y], [rect.max().x, rect.max().y]];
+        let mut tree_intersection_indices = Vec::new();
+        let mut naive_intersection_indices = Vec::new();
 
-impl From<MultiPolygon> for NodeEnvelope {
-    fn from(multi_polygon: MultiPolygon<f64>) -> Self {
-        let envelope = multi_polygon.bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
-
-impl From<MultiPoint<f64>> for NodeEnvelope {
-    fn from(multi_point: MultiPoint<f64>) -> Self {
-        let envelope = multi_point.bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
-
-impl From<LineString<f64>> for NodeEnvelope {
-    fn from(line: LineString<f64>) -> Self {
-        let envelope = line.bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
-
-impl From<MultiLineString<f64>> for NodeEnvelope {
-    fn from(multi_line: MultiLineString<f64>) -> Self {
-        let envelope = multi_line.bounding_rect().unwrap();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
-
-impl From<Line<f64>> for NodeEnvelope {
-    fn from(line: Line<f64>) -> Self {
-        let envelope = line.bounding_rect();
-        NodeEnvelope::BBox([
-            [envelope.min().x, envelope.min().y],
-            [envelope.max().x, envelope.max().y],
-        ])
-    }
-}
-
-#[derive(Debug)]
-pub struct TreeNode {
-    pub index: usize,
-    pub envelope: NodeEnvelope,
-}
-
-impl RTreeObject for TreeNode {
-    type Envelope = AABB<[f64; 2]>;
-
-    fn envelope(&self) -> Self::Envelope {
-        match self.envelope {
-            NodeEnvelope::Point(point) => AABB::from_point(point),
-            NodeEnvelope::BBox(bbox) => AABB::from_corners(bbox[0], bbox[1]),
-        }
+        // calculate tree candidates
+        let intersect_candidates = r_tree
+            .locate_in_envelope_intersecting(&AABB::from_corners(bbox[0].into(), bbox[1].into()));
+        intersect_candidates.for_each(|poly| {
+            // check for intersection
+            if geom.intersects(poly.geom()) {
+                tree_intersection_indices.push(poly.data)
+            }
+        });
+        // calculate naive intersection indices
+        all_polys.iter().for_each(|poly| {
+            // check for intersection
+            if geom.intersects(poly.geom()) {
+                naive_intersection_indices.push(poly.data)
+            }
+        });
+        // sort indices
+        tree_intersection_indices.sort_unstable();
+        naive_intersection_indices.sort_unstable();
+        assert_eq!(&tree_intersection_indices, &naive_intersection_indices)
     }
 }
