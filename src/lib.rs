@@ -33,7 +33,7 @@ mod tests {
         // create the tree
         let ap = all_polys.clone();
         let r_tree: RTree<_> = RTree::bulk_load(ap);
-        let rect = all_polys[0].clone().geom().bounding_rect().unwrap();
+        let rect = geom.bounding_rect().unwrap();
         let bbox = [[rect.min().x, rect.min().y], [rect.max().x, rect.max().y]];
         let mut tree_intersection_indices = Vec::new();
         let mut naive_intersection_indices = Vec::new();
@@ -57,6 +57,6 @@ mod tests {
         // sort indices
         tree_intersection_indices.sort_unstable();
         naive_intersection_indices.sort_unstable();
-        assert_eq!(&tree_intersection_indices, &naive_intersection_indices)
+        assert_eq!(&tree_intersection_indices, &naive_intersection_indices);
     }
 }

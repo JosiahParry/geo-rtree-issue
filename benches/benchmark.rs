@@ -34,7 +34,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("Tree-assisted", |bencher| {
         bencher.iter(|| {
-            let rect = all_polys[0].clone().geom().bounding_rect().unwrap();
+            let rect = geom.bounding_rect().unwrap();
             let bbox = [[rect.min().x, rect.min().y], [rect.max().x, rect.max().y]];
             // calculate candidates
             let intersect_candidates = r_tree.locate_in_envelope_intersecting(&AABB::from_corners(
