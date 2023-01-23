@@ -1,7 +1,7 @@
 // taken from https://github.com/geopolars/geopolars/blob/master/geopolars/src/spatial_index.rs#L208
-use geo::geometry::{Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon, Line};
+use geo::geometry::{Line, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
 use geo::BoundingRect;
-use rstar::{AABB, RTreeObject};
+use rstar::{RTreeObject, AABB};
 
 #[derive(Debug)]
 pub enum NodeEnvelope {
@@ -24,7 +24,6 @@ impl From<Polygon> for NodeEnvelope {
         ])
     }
 }
-
 
 // implement a from &Polygon, this is bad because it clones
 impl From<&Polygon> for NodeEnvelope {
