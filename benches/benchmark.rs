@@ -62,6 +62,14 @@ fn criterion_benchmark(c: &mut Criterion) {
             });
         });
     });
+    c.bench_function("Known to intersect, including slow check", |bencher| {
+        bencher.iter(|| {
+            // geom at idx 52 is very slow to check for an intersection
+            [0usize, 47, 49, 52, 91, 93].iter().for_each(|idx| {
+                criterion::black_box(geom.intersects(all_polys[*idx].geom()));
+            });
+        });
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
