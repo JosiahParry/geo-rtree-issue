@@ -6,7 +6,7 @@ extern crate spatialindex;
 use crate::geo::{BoundingRect, Intersects, Polygon};
 use criterion::Criterion;
 use rstar::{RTree, AABB};
-use spatialindex::{NodeEnvelope, TreeNode};
+use spatialindex::PolyWithIndex;
 use std::io::BufRead;
 use std::{fs::File, io::BufReader};
 use wkt::TryFromWkt;
@@ -16,46 +16,42 @@ fn criterion_benchmark(c: &mut Criterion) {
     let f = File::open("geoms.txt").expect("this shit to work");
     let f = BufReader::new(f);
 
-    // creater a vector of polygons
-    let mut all_polys: Vec<Polygon> = Vec::new();
-    for line in f.lines() {
-        let line = line.expect("Unable to read line");
-        let ply: Polygon<f64> = Polygon::try_from_wkt_str(line.as_str()).unwrap();
-        all_polys.push(ply);
-    }
-    let geom = all_polys[0].clone();
+    // create a vector of polygons
+    let all_polys = f
+        .lines()
+        .enumerate()
+        .map(|(idx, line)| {
+            let line = line.expect("Unable to read line");
+            let ply: Polygon<f64> = Polygon::try_from_wkt_str(line.as_str()).unwrap();
+            PolyWithIndex::new(ply, idx)
+        })
+        .collect::<Vec<PolyWithIndex>>();
+
+    let geom = all_polys[0].geom().clone();
+    // create the tree
+    let ap = all_polys.clone();
+    let r_tree: RTree<_> = RTree::bulk_load(ap);
 
     c.bench_function("Tree-assisted", |bencher| {
         bencher.iter(|| {
-            // create the tree
-            let mut r_tree: RTree<TreeNode> = RTree::new();
-
-            for (index, geom) in all_polys.clone().into_iter().enumerate() {
-                let env = NodeEnvelope::from(geom);
-                let node = TreeNode {
-                    index,
-                    envelope: env,
-                };
-                r_tree.insert(node);
-            }
-
-            let rect = all_polys[0].clone().bounding_rect().unwrap();
+            let rect = all_polys[0].clone().geom().bounding_rect().unwrap();
             let bbox = [[rect.min().x, rect.min().y], [rect.max().x, rect.max().y]];
-
-            let intersect_candidates =
-                r_tree.locate_in_envelope_intersecting(&AABB::from_corners(bbox[0], bbox[1]));
-            let indexes: Vec<usize> = intersect_candidates.map(|node| node.index).collect();
-
-            // find the candidates and then check if actually intersecting
-            for cand_index in indexes.clone() {
-                criterion::black_box(geom.intersects(&all_polys[cand_index]));
-            }
+            // calculate candidates
+            let intersect_candidates = r_tree.locate_in_envelope_intersecting(&AABB::from_corners(
+                bbox[0].into(),
+                bbox[1].into(),
+            ));
+            intersect_candidates.for_each(|poly| {
+                // check for intersection
+                criterion::black_box(geom.intersects(poly.geom()));
+            });
         });
     });
     c.bench_function("Naive", |bencher| {
         bencher.iter(|| {
             all_polys.iter().for_each(|poly| {
-                criterion::black_box(geom.intersects(poly));
+                // check for intersection
+                criterion::black_box(geom.intersects(poly.geom()));
             });
         });
     });
