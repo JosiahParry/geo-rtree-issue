@@ -55,6 +55,13 @@ fn criterion_benchmark(c: &mut Criterion) {
             });
         });
     });
+    c.bench_function("Known to intersect", |bencher| {
+        bencher.iter(|| {
+            [0usize, 47, 49, 91, 93].iter().for_each(|idx| {
+                criterion::black_box(geom.intersects(all_polys[*idx].geom()));
+            });
+        });
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
