@@ -47,24 +47,16 @@ fn criterion_benchmark(c: &mut Criterion) {
             let indexes: Vec<usize> = intersect_candidates.map(|node| node.index).collect();
 
             // find the candidates and then check if actually intersecting
-            let mut true_hits = Vec::new();
             for cand_index in indexes.clone() {
-                let hit = geom.intersects(&all_polys[cand_index]);
-                if hit {
-                    true_hits.push(cand_index);
-                }
+                criterion::black_box(geom.intersects(&all_polys[cand_index]));
             }
         });
     });
     c.bench_function("Naive", |bencher| {
         bencher.iter(|| {
-            let mut true_hits = Vec::new();
-            for cand_index in 0..all_polys.len() {
-                let hit = geom.intersects(&all_polys[cand_index]);
-                if hit {
-                    true_hits.push(cand_index);
-                }
-            }
+            all_polys.iter().for_each(|poly| {
+                criterion::black_box(geom.intersects(poly));
+            });
         });
     });
 }
