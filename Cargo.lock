@@ -652,7 +652,6 @@ dependencies = [
  "criterion",
  "fs",
  "geo",
- "geo-types",
  "rstar",
  "wkt",
 ]
