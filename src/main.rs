@@ -1,50 +1,51 @@
-
-mod erm;
-use crate::erm::*;
-
-
-//use geo::{BoundingRect, Intersects};
-use geo_types::{Polygon};
-use rstar::RTree;
-use std::fs::File;
-use std::io::{BufReader, BufRead};
-use wkt::{TryFromWkt};
-
-use rstar::primitives::GeomWithData;
-
+use geo::Geometry;
+use rayon::prelude::*;
+use serde_json::{Map, Value};
+use std::time::{Instant};
 
 fn main() {
 
-    // read geometries from a text file
-    let f = File::open("geoms.txt").expect("this shit to work"); 
-    let f = BufReader::new(f);
+  // downloaded from https://azuremapscodesamples.azurewebsites.us/Common/data/geojson/parcels.json
+  
+    let start = Instant::now();
+    let fp =  "/Users/josiahparry/Downloads/parcels.geojson";
 
-    // creater a vector of polygons
-    let mut all_polys: Vec<Polygon> = Vec::new();
+    let file = std::fs::File::open(fp)
+        .expect("this to work");
+  
+    let data = geojson::FeatureReader::from_reader(file);
 
-    for line in f.lines() {
-        let line = line.expect("Unable to read line");
-        let ply: Polygon<f64> = Polygon::try_from_wkt_str(line.as_str()).unwrap();
-        all_polys.push(ply);
-    
-    }
+    let res = data
+        .features()
+        .par_bridge()
+        .into_par_iter()
+        .map(|feat| feat.unwrap().properties.unwrap())
+        .collect::<Vec<Map<String, Value>>>();
 
-    // create the tree
-    let mut r_tree = RTree::new();
+        let duration = start.elapsed();
 
-    // insert into rtree with index as data
-    for (index, geom) in all_polys.clone().into_iter().enumerate() {
-        let geom = GeomWithData::new(geom, index);
-        r_tree.insert(geom);
-    }
+        println!("Time elapsed is: {:?}", duration);
 
+    // time reading geometries 
+    let start = Instant::now();
+    let fp =  "/Users/josiahparry/Downloads/parcels.geojson";
 
-    let papa = r_tree.root();
+    let file = std::fs::File::open(fp)
+        .expect("this to work");
+  
+    let data = geojson::FeatureReader::from_reader(file);
 
+    let res = data
+        .features()
+        .par_bridge()
+        .into_par_iter()
+        .map(|feat| geo::Geometry::try_from(feat.unwrap().geometry.unwrap()).unwrap())
+        .collect::<Vec<Geometry>>();
 
-    let x = inner(papa);
+        let duration = start.elapsed();
 
-    
+        println!("Time elapsed is: {:?}", duration);
 }
+
 
 

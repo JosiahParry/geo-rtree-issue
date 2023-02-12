@@ -9,5 +9,8 @@ edition = "2021"
 fs = "0.0.5"
 geo = "0.23.1"
 geo-types = { version = "0.7.8", features = ["use-rstar_0_9"] } 
+geojson = "0.24.0"
+rayon = "1.6.1"
 rstar = "0.9.3"
+serde_json = "1.0.93"
 wkt = "0.10.3"
